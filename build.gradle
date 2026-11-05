@@ -27,7 +27,7 @@ java {
 }
 
 ext {
-    mindustryVersion = "v159.6"
+    mindustryVersion = "v160"
 }
 
 dependencies {
