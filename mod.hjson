@@ -1,8 +1,8 @@
-name: "tcp-mod"
-displayName: "TCP over UDP"
-author: "regator47"
-description: "Force TCP connections instead of UDP to reduce error snapshots."
-version: "1.0"
+name: "mindustry-tcp-mod-extended"
+displayName: "TCP over UDP Extended"
+author: "Psimoo"
+description: "Extended fork with TCP forcing, a network monitor, and host snapshot TCP."
+version: "1.0.1"
 main: "mindustry.tcpmod.TCPMod"
 minGameVersion: "159"
 java: true

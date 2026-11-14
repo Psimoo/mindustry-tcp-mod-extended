@@ -4,6 +4,7 @@ import arc.Core;
 import arc.Events;
 import arc.files.Fi;
 import arc.graphics.Color;
+import arc.scene.ui.Label;
 import arc.scene.ui.layout.Table;
 import arc.util.Http;
 import arc.util.Log;
@@ -12,15 +13,16 @@ import mindustry.Vars;
 import mindustry.gen.Icon;
 import mindustry.game.EventType.ClientLoadEvent;
 import mindustry.mod.Mod;
+import mindustry.tcpmod.ui.NetMonitorDialog;
 import mindustry.ui.Styles;
 import mindustry.ui.dialogs.BaseDialog;
 
 public class TCPMod extends Mod {
 
-    private static final String REPO = "Regator48/mindustry-tcp-mod";
+    private static final String REPO = "Psimoo/mindustry-tcp-mod-extended";
     private static final String API_URL = "https://api.github.com/repos/" + REPO + "/releases/latest";
     private static Table tcpIndicator;
-    private static String currentVersion = "1.4";
+    private static String currentVersion = "1.0.1";
     private static String latestVersion = null;
     private static String downloadUrl = null;
 
@@ -31,6 +33,9 @@ public class TCPMod extends Mod {
     @Override
     public void init() {
         Log.info("TCP Mod: init");
+
+        TCPForcer.install();
+        TCPForcer.setForceServer(Core.settings.getBool("tcp-mod-force-server", false));
 
         if (Core.settings.getBool("tcp-mod-enabled", false)) {
             TCPForcer.enable();
@@ -47,12 +52,23 @@ public class TCPMod extends Mod {
 
     private void setupHUD() {
         tcpIndicator = new Table();
-        tcpIndicator.visible(() -> Vars.ui.hudfrag.shown && Vars.state.isGame() && TCPForcer.isActive());
+
+        tcpIndicator.visible(() -> Vars.ui.hudfrag.shown && Vars.state.isGame()
+            && TCPForcer.isActive() && TCPForcer.isClientRole());
         tcpIndicator.top().left();
+        Label[] label = new Label[1];
         tcpIndicator.table(t -> {
             t.background(Styles.black6);
             t.margin(6f);
-            t.add("[TCP]").color(Color.yellow).style(Styles.defaultLabel);
+            label[0] = t.add("[TCP]").color(Color.yellow).style(Styles.defaultLabel).get();
+        });
+        tcpIndicator.update(() -> {
+            NetMonitor.updateRates();
+            if (label[0] != null && TCPForcer.isActive()) {
+                label[0].setText("[TCP " + TCPForcer.routedPackets() + "]"
+                    + "  \u2191 " + NetMonitor.fmt(NetMonitor.txBytesPerSec()) + "/s"
+                    + "  \u2193 " + NetMonitor.fmt(NetMonitor.rxBytesPerSec()) + "/s");
+            }
         });
         Vars.ui.hudGroup.addChild(tcpIndicator);
     }
@@ -65,18 +81,16 @@ public class TCPMod extends Mod {
             try {
                 String json = response.getResultAsString();
 
-                // Simple parsing without Jval
                 int tagStart = json.indexOf("\"tag_name\":\"") + 12;
                 int tagEnd = json.indexOf("\"", tagStart);
                 if (tagStart > 11 && tagEnd > tagStart) {
                     latestVersion = json.substring(tagStart, tagEnd).replace("v", "");
                 }
 
-                // Find browser_download_url value
                 String dlKey = "browser_download_url";
                 int dlKeyIdx = json.indexOf(dlKey);
                 if (dlKeyIdx >= 0) {
-                    // Find the opening quote of the value (after the colon)
+
                     int colonIdx = json.indexOf(":", dlKeyIdx + dlKey.length());
                     int valueQuoteStart = json.indexOf("\"", colonIdx + 1);
                     int valueQuoteEnd = json.indexOf("\"", valueQuoteStart + 1);
@@ -199,7 +213,42 @@ public class TCPMod extends Mod {
           .color(enabled ? Color.green : Color.red).row();
 
         dialog.cont.add(enabled ? "Status: ACTIVE" : "Status: INACTIVE")
-            .color(enabled ? Color.green : Color.red).pad(10);
+            .color(enabled ? Color.green : Color.red).pad(10).row();
+
+        boolean serverForced = TCPForcer.isForceServer();
+        dialog.cont.button("Host snapshots \u2192 TCP: " + (serverForced ? "ON" : "OFF"), () -> {
+            boolean next = !TCPForcer.isForceServer();
+            TCPForcer.setForceServer(next);
+            Core.settings.put("tcp-mod-force-server", next);
+            dialog.hide();
+            showDialog();
+        }).width(280).height(50).pad(4)
+          .color(serverForced ? Color.orange : Color.gray).row();
+
+        dialog.cont.add("Experimental, host-only: routes entity/state snapshots over TCP to prevent "
+                + "the 20s snapshot timeout. Requires TCP mode ON; clients still need the mod for their own sends.")
+            .color(Color.gray).fontScale(0.8f).wrap().growX().pad(4).row();
+
+        dialog.cont.button("Network Monitor", () -> new NetMonitorDialog().show())
+            .width(200).height(50).pad(6).row();
+
+        boolean hosting = Vars.net != null && Vars.net.server();
+
+        if (enabled) {
+            dialog.cont.add("TCP packets: " + TCPForcer.routedPackets()
+                    + " | server TCP: " + TCPForcer.serverRoutedPackets()
+                    + " | fallback: " + TCPForcer.fallbackPackets())
+                .color(Color.lightGray).fontScale(0.9f).pad(5).row();
+        }
+
+        if (hosting) {
+            dialog.cont.add("You are hosting: enable \u201cHost snapshots \u2192 TCP\u201d above to send "
+                    + "entity/state snapshots to clients over TCP instead of UDP.")
+                .color(Color.orange).fontScale(0.85f).wrap().growX().pad(8).row();
+        } else {
+            dialog.cont.add("Only outgoing packets from this client are forced over TCP.")
+                .color(Color.gray).fontScale(0.85f).wrap().growX().pad(8).row();
+        }
 
         if (latestVersion != null && !latestVersion.equals(currentVersion)) {
             dialog.cont.row();

@@ -26,7 +26,6 @@ public class TCPSettingsDialog extends BaseDialog {
         cont.clear();
         cont.top();
 
-        // Header
         cont.table(header -> {
             header.left();
             header.image(Icon.link)
@@ -40,7 +39,6 @@ public class TCPSettingsDialog extends BaseDialog {
                     .left();
         }).growX().pad(10).row();
 
-        // Description
         cont.add("Force TCP connections instead of UDP to reduce error snapshots.")
                 .color(Color.lightGray)
                 .fontScale(0.9f)
@@ -49,10 +47,8 @@ public class TCPSettingsDialog extends BaseDialog {
                 .pad(10)
                 .row();
 
-        // Toggle card
         buildToggleCard();
 
-        // Status
         cont.table(status -> {
             status.left();
             status.add("Status: ")

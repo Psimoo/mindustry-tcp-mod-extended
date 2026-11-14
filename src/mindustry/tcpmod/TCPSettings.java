@@ -7,7 +7,7 @@ public class TCPSettings {
     private static final String SETTING_KEY = "tcp-mod.tcp-enabled";
 
     public static void load() {
-        // Settings are automatically loaded by Core.settings
+
         Log.info("TCP Mod: Settings loaded, TCP enabled = " + isTcpEnabled());
     }
 
